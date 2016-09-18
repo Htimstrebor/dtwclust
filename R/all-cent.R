@@ -149,9 +149,22 @@ all_cent <- function(case = NULL, distmat, distfun, control, fuzzy = FALSE) {
           new_cent
      }
 
-     fcm_cent <- function(x, u) {
+     fcm_cent <- function(x, u, ...) {
           cent <- t(u) %*% do.call(rbind, x)
           apply(cent, 2L, "/", e2 = colSums(u))
+     }
+
+     fcmdd_cent <- function(x, u, ...) {
+          if (is.null(distmat))
+               distmat <<- distfun(x, centroids = NULL, ...)
+
+          q <- distmat %*% u
+          idc <- apply(q, 2L, which.min)
+
+          cent <- x[idc]
+          attr(cent, "id_cent") <- idc
+
+          cent
      }
 
      if (fuzzy) {
@@ -159,12 +172,16 @@ all_cent <- function(case = NULL, distmat, distfun, control, fuzzy = FALSE) {
                ## cent and cl_old are unused here, but R complains if signatures don't match
                u <- cl_id ^ control@fuzziness
 
+               fuzzy_cent <- switch(case,
+                                    "fcm" = fcm_cent,
+                                    "fcmdd" = fcmdd_cent)
+
                ## utils.R
                if (check_multivariate(x)) {
                     ## multivariate
                     mv <- reshape_multviariate(x, NULL)
 
-                    cent <- lapply(mv$series, fcm_cent, u = u)
+                    cent <- lapply(mv$series, fuzzy_cent, u = u, ...)
                     cent <- lapply(1L:k, function(idc) {
                          sapply(cent, function(c) { c[idc, , drop = TRUE] })
                     })
@@ -173,7 +190,7 @@ all_cent <- function(case = NULL, distmat, distfun, control, fuzzy = FALSE) {
                     return(cent)
                }
 
-               cent <- fcm_cent(x, u)
+               cent <- fuzzy_cent(x, u, ...)
 
                # Coerce back to list
                consistency_check(cent, "tsmat")

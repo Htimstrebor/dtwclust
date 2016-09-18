@@ -2,7 +2,7 @@
 # Modified version of flexclust::kcca to use lists of time series and/or support fuzzy clustering
 # ========================================================================================================
 
-kcca.list <- function (x, k, family, control, fuzzy = FALSE, ...)
+kcca.list <- function (x, k, family, control, fuzzy = FALSE, ..., centroid)
 {
      N <- length(x)
      k <- as.integer(k)
@@ -30,7 +30,7 @@ kcca.list <- function (x, k, family, control, fuzzy = FALSE, ...)
      objective_old <- Inf
 
      while (iter <= control@iter.max) {
-          clustold <- cluster
+          clustold <- if (centroid != "fcmdd") cluster else attr(centroids, "id_cent")
 
           distmat <- family@dist(x, centroids, ...)
 
@@ -43,7 +43,7 @@ kcca.list <- function (x, k, family, control, fuzzy = FALSE, ...)
                                       cl_old = clustold,
                                       ...)
 
-          if (fuzzy) {
+          if (fuzzy && centroid == "fcm") {
                # fuzzy.R
                objective <- fuzzy_objective(cluster, distmat = distmat, m = control@fuzziness)
 
@@ -62,7 +62,10 @@ kcca.list <- function (x, k, family, control, fuzzy = FALSE, ...)
                objective_old <- objective
 
           } else {
-               changes <- sum(cluster != clustold)
+               if (centroid != "fcmdd")
+                    changes <- sum(cluster != clustold)
+               else
+                    changes <- sum(attr(centroids, "id_cent") != clustold)
 
                if (control@trace) {
                     td <- sum(distmat[cbind(1L:N, cluster)])

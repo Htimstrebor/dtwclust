@@ -123,8 +123,8 @@
 #'   \item "pam": Partition around medoids (PAM). This basically means that the cluster centroids are always
 #'   one of the time series in the data. In this case, the distance matrix can be pre-computed once using all
 #'   time series in the data and then re-used at each iteration. It usually saves overhead overall.
-#'   \item "fcm": Fuzzy c-means. Only supported for fuzzy clustering and always used for that type of clustering
-#'   if a string is provided in \code{centroid}.
+#'   \item "fcm": Fuzzy c-means. Only supported for fuzzy clustering and used used by default in that case.
+#'   \item "fcmdd": Fuzzy c-medoids. Only supported for fuzzy clustering.
 #' }
 #'
 #' These check for the special cases where parallelization might be desired. Note that only \code{shape},
@@ -344,8 +344,11 @@ dtwclust <- function(data = NULL, type = "partitional", k = 2L, method = "averag
 
      MYCALL <- match.call(expand.dots = TRUE)
 
-     if (type == "fuzzy" && !missing(centroid) && is.character(centroid) && centroid != "fcm")
-          warning("The 'centroid' argument was provided but was different than 'fcm', so it was ignored.")
+     ## this goes here because it uses missing()
+     fuzzy_flag <- FALSE
+     if (type == "fuzzy" && !missing(centroid)) {
+          fuzzy_flag <- TRUE
+     }
 
      ## ----------------------------------------------------------------------------------------------------------
      ## Control parameters
@@ -414,10 +417,15 @@ dtwclust <- function(data = NULL, type = "partitional", k = 2L, method = "averag
 
      if(type %in% c("partitional", "fuzzy")) {
           if (is.character(centroid)) {
-               if (type == "fuzzy")
-                    centroid <- "fcm"
-               else
+               if (type == "fuzzy") {
+                    if (fuzzy_flag)
+                         centroid <- match.arg(centroid, c("fcm", "fcmdd"))
+                    else
+                         centroid <- "fcm"
+
+               } else {
                     centroid <- match.arg(centroid, c("mean", "median", "shape", "dba", "pam"))
+               }
           }
 
           if (diff_lengths)
@@ -463,8 +471,7 @@ dtwclust <- function(data = NULL, type = "partitional", k = 2L, method = "averag
           distmat_flag <- FALSE
 
           # precompute distance matrix?
-          if (is.character(centroid) && centroid == "pam") {
-
+          if (is.character(centroid) && centroid %in% c("pam", "fcmdd")) {
                ## check if distmat was not provided and should be precomputed
                if (!is.null(distmat)) {
                     if ( nrow(distmat) != length(data) || ncol(distmat) != length(data) )
@@ -476,7 +483,7 @@ dtwclust <- function(data = NULL, type = "partitional", k = 2L, method = "averag
                     if (control@trace)
                          cat("\n\tDistance matrix provided...\n\n")
 
-               } else if (control@pam.precompute) {
+               } else if (control@pam.precompute || centroid == "fcmdd") {
                     if (tolower(distance) == "dtw_lb")
                          warning("Using dtw_lb with control@pam.precompute = TRUE is not advised.")
 
@@ -538,7 +545,8 @@ dtwclust <- function(data = NULL, type = "partitional", k = 2L, method = "averag
                                               k = k,
                                               family = family,
                                               control = control,
-                                              fuzzy = isTRUE(type == "fuzzy")))))
+                                              fuzzy = isTRUE(type == "fuzzy"),
+                                              centroid = centroid))))
 
           } else {
                ## I need to re-register any custom distances in each parallel worker
@@ -569,7 +577,8 @@ dtwclust <- function(data = NULL, type = "partitional", k = 2L, method = "averag
                                                       k = k,
                                                       family = family,
                                                       control = control,
-                                                      fuzzy = isTRUE(type == "fuzzy"))))
+                                                      fuzzy = isTRUE(type == "fuzzy"),
+                                                      centroid = centroid)))
 
                                  gc(FALSE)
 
