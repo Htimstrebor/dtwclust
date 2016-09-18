@@ -13,7 +13,7 @@ kcca.list <- function (x, k, family, control, fuzzy = FALSE, ..., centroid)
      if (is.null(names(x)))
           names(x) <- paste0("series_", 1:N) # used by custom PAM centroids
 
-     if (fuzzy) {
+     if (fuzzy && centroid == "fcm") {
           cluster <- matrix(0, N, k)
           cluster[ , -1L] <- stats::runif(N *(k - 1)) / (k - 1)
           cluster[ , 1L] <- 1 - apply(cluster[ , -1L, drop = FALSE], 1L, sum)
